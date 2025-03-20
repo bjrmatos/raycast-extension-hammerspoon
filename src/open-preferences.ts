@@ -15,5 +15,5 @@ export default async function main() {
       end tell
     `)
 
-  await closeMainWindow()
+  await closeMainWindow({ clearRootSearch: true })
 }

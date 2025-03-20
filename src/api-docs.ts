@@ -17,5 +17,5 @@ export default async function main() {
 
   // TODO: focus the webview
 
-  await closeMainWindow()
+  await closeMainWindow({ clearRootSearch: true })
 }
