@@ -36,12 +36,6 @@
       "title": "Restart",
       "description": "Quits and restarts Hammerspoon",
       "mode": "no-view"
-    },
-    {
-      "name": "api-docs",
-      "title": "API Docs",
-      "description": "Display's Hammerspoon API documentation in a webview browser",
-      "mode": "no-view"
     }
   ],
   "dependencies": {
