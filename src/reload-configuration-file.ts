@@ -11,7 +11,7 @@ export default async function main() {
 
   await runAppleScript(`
     tell application "Hammerspoon"
-      execute lua code "hs.reload()"
+      execute lua code "hs.reload(); hs.openConsole()"
     end tell
   `)
 
