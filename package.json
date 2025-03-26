@@ -36,6 +36,12 @@
       "title": "Restart",
       "description": "Quits and restarts Hammerspoon",
       "mode": "no-view"
+    },
+    {
+      "name": "show-version",
+      "title": "Show Version",
+      "description": "Shows the version of Hammerspoon",
+      "mode": "no-view"
     }
   ],
   "dependencies": {
