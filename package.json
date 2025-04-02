@@ -42,6 +42,12 @@
       "title": "Show Version",
       "description": "Shows the version of Hammerspoon",
       "mode": "no-view"
+    },
+    {
+      "name": "clear-console",
+      "title": "Clear Console",
+      "description": "Clears the Hammerspoon Console",
+      "mode": "no-view"
     }
   ],
   "dependencies": {
