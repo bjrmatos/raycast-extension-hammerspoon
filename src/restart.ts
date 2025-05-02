@@ -1,4 +1,4 @@
-import { showHUD, showToast, Toast } from '@raycast/api'
+import { showHUD, showToast, Toast, popToRoot } from '@raycast/api'
 import { runAppleScript } from '@raycast/utils'
 
 import { checkHammerspoonInstallation } from './utils/installation'
@@ -9,6 +9,13 @@ export default async function main() {
   if (!isInstalled) {
     return
   }
+
+  popToRoot({ clearSearchBar: true })
+
+  const toast = await showToast({
+    style: Toast.Style.Animated,
+    title: '🔨 Restarting Hammerspoon'
+  })
 
   const output = await runAppleScript(`
     try
@@ -33,11 +40,15 @@ export default async function main() {
   `)
 
   if (output === 'true') {
+    await runAppleScript(`
+      tell application "Hammerspoon"
+        execute lua code "hs.openConsole()"
+      end tell
+    `)
+
     await showHUD('🔨 Hammerspoon was restarted')
   } else {
-    await showToast({
-      style: Toast.Style.Failure,
-      title: '🔨 Hammerspoon was restarted but we could not detect if it started again. Please check manually.'
-    })
+    toast.style = Toast.Style.Failure
+    toast.title = '🔨 Hammerspoon was restarted but we could not detect if it started again. Please check manually.'
   }
 }
