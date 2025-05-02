@@ -1,3 +1,5 @@
 # Hammerspoon
 
-Control Hammerspoon. Reload config file, open settings. Requires installing Hammerspoon.
+Control Hammerspoon directly from Raycast.
+
+Requires the installation of Hammerspoon. Go to https://www.hammerspoon.org/ to download

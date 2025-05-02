@@ -1,3 +1,3 @@
 # Hammerspoon Changelog
 
-## [Initial Version] - {PR_MERGE_DATE}
+## [Initial Version] 1.0.0 - {PR_MERGE_DATE}

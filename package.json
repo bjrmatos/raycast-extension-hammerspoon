@@ -2,7 +2,8 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "hammerspoon",
   "title": "Hammerspoon",
-  "description": "Control Hammerspoon. Reload config file, open settings. Requires installing Hammerspoon.",
+  "description": "Control Hammerspoon from Raycast",
+  "version": "1.0.0",
   "icon": "icon-dev.png",
   "author": "bjrmatos",
   "categories": [
