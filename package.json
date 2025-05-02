@@ -4,7 +4,7 @@
   "title": "Hammerspoon",
   "description": "Control Hammerspoon from Raycast",
   "version": "1.0.0",
-  "icon": "icon-dev.png",
+  "icon": "icon-prod.png",
   "author": "bjrmatos",
   "categories": [
     "Productivity"
