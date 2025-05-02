@@ -21,73 +21,78 @@ try {
     throw new Error('Please provide a version number.')
   }
 
-  // Step 1: Make sure lint does not complaint
-  await step('Linter', () => $`npm run lint`)
+  const DEV_MODE = targetVersion === 'dev'
 
-  const prodIcon = 'icon-prod.png'
+  if (!DEV_MODE) {
+    // Step 1: Make sure lint does not complaint
+    await step('Linter', () => $`npm run lint`)
 
-  // Step 2: Modify package.json icon property and ensure build
-  await step('Ensuring Prod Mode', async () => {
-    updatePkg({ icon: prodIcon })
-    await $`npm run build`
-  })
+    const prodIcon = 'icon-prod.png'
 
-  await step('Checking release commit', async (meta) => {
-    const steps = []
+    // Step 2: Modify package.json icon property and ensure build
+    await step('Ensuring Prod Mode', async () => {
+      updatePkg({ icon: prodIcon })
+      await $`npm run build`
+    })
 
-    const saveToMeta = (ok) => {
-      if (steps.length === 0) {
-        return
+    await step('Checking release commit', async (meta) => {
+      const steps = []
+
+      const saveToMeta = (ok) => {
+        if (steps.length === 0) {
+          return
+        }
+
+        const extra = steps
+          .map((step) => (ok ? step.name : `${step.name} ${step.completed === true ? 'OK' : 'FAIL'}`))
+          .join(', ')
+
+        meta.extra = extra
       }
 
-      const extra = steps
-        .map((step) => (ok ? step.name : `${step.name} ${step.completed === true ? 'OK' : 'FAIL'}`))
-        .join(', ')
+      try {
+        // Check if the release commit already exists
+        const commitExists = await $`git log --oneline --grep="release ${targetVersion}"`
 
-      meta.extra = extra
-    }
+        updatePkg({ version: targetVersion, icon: prodIcon })
 
-    try {
-      // Check if the release commit already exists
-      const commitExists = await $`git log --oneline --grep="release ${targetVersion}"`
+        if (!commitExists.stdout) {
+          const commitStep = { name: 'commit' }
 
-      updatePkg({ version: targetVersion, icon: prodIcon })
+          steps.push(commitStep)
 
-      if (!commitExists.stdout) {
-        const commitStep = { name: 'commit' }
+          // If it does not exists we create the commit and tag
+          // Step 3: Create a commit
+          await $`git add ${packageJsonPath}`
+          await $`git commit -m "release ${targetVersion}"`
+          commitStep.completed = true
 
-        steps.push(commitStep)
+          const tagStep = { name: 'tag' }
 
-        // If it does not exists we create the commit and tag
-        // Step 3: Create a commit
-        await $`git add ${packageJsonPath}`
-        await $`git commit -m "release ${targetVersion}"`
-        commitStep.completed = true
+          steps.push(tagStep)
 
-        const tagStep = { name: 'tag' }
+          // Step 4: Create a tag
+          await $`git tag ${targetVersion}`
+          tagStep.completed = true
+        }
 
-        steps.push(tagStep)
-
-        // Step 4: Create a tag
-        await $`git tag ${targetVersion}`
-        tagStep.completed = true
+        saveToMeta(true)
+      } catch (error) {
+        saveToMeta(false)
+        throw error
       }
+    })
 
-      saveToMeta(true)
-    } catch (error) {
-      saveToMeta(false)
-      throw error
-    }
-  })
-
-  // Step 5: Publish using Raycast API
-  await step('Raycast Publish', () => $`npx ray publish`)
-
-  // Step 6: Restore the dev icon and ensure build
-  await step('Ensuring Dev mode', async () => {
-    updatePkg({ version: targetVersion, icon: 'icon-dev.png' })
-    await $`npm run build`
-  })
+    console.log(
+      '\nAll done now it is time to publish, run:\nnpx ray publish\nafter it dont forget to go back to dev mode with:\nnpm run publish dev'
+    )
+  } else {
+    // Step: Restore the dev icon and ensure build
+    await step('Ensuring Dev mode', async () => {
+      updatePkg({ version: targetVersion, icon: 'icon-dev.png' })
+      await $`npm run build`
+    })
+  }
 } catch (error) {
   spinner.fail(`Publish failed: ${error.message}`)
 
