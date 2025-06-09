@@ -55,7 +55,17 @@
       "name": "restart",
       "title": "Restart",
       "description": "Quits and restarts Hammerspoon",
-      "mode": "no-view"
+      "mode": "no-view",
+      "preferences": [
+        {
+          "default": true,
+          "description": "Open the Hammerspoon Console after reloading the configuration file",
+          "label": "Open Console",
+          "name": "openConsole",
+          "required": false,
+          "type": "checkbox"
+        }
+      ]
     },
     {
       "name": "show-version",
