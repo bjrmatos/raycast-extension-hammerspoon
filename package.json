@@ -52,6 +52,12 @@
       "mode": "no-view"
     },
     {
+      "name": "search-documentation",
+      "title": "Search Documentation",
+      "description": "Search Hammerspoon Documentation",
+      "mode": "view"
+    },
+    {
       "name": "restart",
       "title": "Restart",
       "description": "Quits and restarts Hammerspoon",
