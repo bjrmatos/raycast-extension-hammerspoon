@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import fsPromise from 'node:fs/promises'
-import { ActionPanel, Detail, List, Action, Icon } from '@raycast/api'
+import { ActionPanel, Detail, List, Action, Icon, Color } from '@raycast/api'
 import { runAppleScript, useCachedPromise, useCachedState } from '@raycast/utils'
 import { useMemo } from 'react'
 import path from 'node:path'
@@ -8,7 +8,7 @@ import path from 'node:path'
 const defaultSource = { name: 'All Sources', path: '*' }
 
 export default function main() {
-  const [selectedSource, setSelectedSource] = useCachedState<SourceItem>('selected-sourced', defaultSource)
+  const [selectedSource, setSelectedSource] = useCachedState<SourceItem>('selected-source', defaultSource)
 
   const {
     isLoading,
@@ -40,18 +40,51 @@ export default function main() {
     },
     [],
     {
-      initialData: { sourceList: [], documentationList: [] },
+      initialData: {
+        sourceList: [],
+        sourceToDocumentationRangeEntries: [],
+        documentationList: [],
+        documentationItemsEntries: []
+      } as DocumentationRepository,
       failureToastOptions: {
         title: "Couldn't resolve documentation files of Hammerspoon"
       }
     }
   )
 
+  const sourceToDocumentationRangeMap = useMemo(() => {
+    return new Map(documentationRepository.sourceToDocumentationRangeEntries)
+  }, [documentationRepository])
+
+  const documentationItemsMap = useMemo(() => {
+    return new Map(documentationRepository.documentationItemsEntries)
+  }, [documentationRepository])
+
   const sourceDropdownItems = useMemo(() => {
     const files: SourceItem[] = [defaultSource]
     files.push(...documentationRepository.sourceList)
     return files
   }, [documentationRepository])
+
+  const groups = useMemo(() => {
+    const result = []
+
+    for (const [sourcePath, range] of sourceToDocumentationRangeMap.entries()) {
+      const selectedSourceItem = documentationRepository.sourceList.find((source) => source.path === sourcePath)
+
+      if (selectedSourceItem) {
+        const [rangeStart, rangeEnd] = range
+
+        result.push({
+          id: `${selectedSourceItem.name}-${selectedSourceItem.path}`,
+          name: selectedSourceItem.name,
+          items: documentationRepository.documentationList.slice(rangeStart, rangeEnd)
+        })
+      }
+    }
+
+    return result
+  }, [documentationRepository, sourceToDocumentationRangeMap])
 
   const dropdownSourceFilesEl = (
     <List.Dropdown
@@ -71,19 +104,37 @@ export default function main() {
           key={`${item.name}-${item.path}`}
           title={item.name}
           value={`${item.name}\n${item.path}`}
-          icon={Icon.Folder}
+          icon={getSourceIcon(item)}
         />
       ))}
     </List.Dropdown>
   )
 
-  const listItems = useMemo(() => {
-    if (selectedSource.path === '*') {
-      return documentationRepository.documentationList
+  let listContentEl
+
+  if (selectedSource.path === '*') {
+    const groupEls = []
+
+    for (const group of groups) {
+      groupEls.push(
+        <List.Section key={group.id} title={group.name}>
+          {renderListItems(group.items)}
+        </List.Section>
+      )
     }
 
-    return documentationRepository.documentationList.filter((item) => item.sourceFile === selectedSource.path)
-  }, [documentationRepository, selectedSource])
+    listContentEl = groupEls
+  } else {
+    const selectedSourceItem = documentationRepository.sourceList.find((source) => source.path === selectedSource.path)
+    const targetPath = selectedSourceItem?.path ?? ''
+
+    const range = sourceToDocumentationRangeMap.get(targetPath)
+
+    if (range) {
+      const [rangeStart, rangeEnd] = range
+      listContentEl = renderListItems(documentationRepository.documentationList.slice(rangeStart, rangeEnd + 1))
+    }
+  }
 
   return (
     <List
@@ -91,29 +142,15 @@ export default function main() {
       searchBarPlaceholder="Type to search Hammerspoon documentation..."
       searchBarAccessory={dropdownSourceFilesEl}
     >
-      <List.Section title="Results">
-        {listItems.map((item) => (
-          <List.Item
-            key={item.id}
-            icon={Icon.Bird}
-            title={item.name}
-            subtitle={item.description}
-            actions={
-              <ActionPanel>
-                <Action.Push
-                  title="Show Details"
-                  target={<Detail markdown={getMarkdownForDocumentationItem(item)} />}
-                />
-              </ActionPanel>
-            }
-          />
-        ))}
-      </List.Section>
+      {listContentEl}
     </List>
   )
 }
 
+type SourceType = 'hs' | 'Lua' | 'Spoon'
+
 interface SourceItem {
+  type?: SourceType
   name: string
   path: string
 }
@@ -125,19 +162,50 @@ interface DocumentationOutput {
 
 interface DocumentationRepository {
   sourceList: SourceItem[]
+  sourceToDocumentationRangeEntries: Array<[string, [number, number]]>
   documentationList: DocumentationItem[]
-  documentationItemsMap: Map<string, number>
+  documentationItemsEntries: Array<[string, number]>
 }
 
 interface DocumentationItem {
   id: string
-  sourceType: 'hs' | 'Lua' | 'Spoon'
+  sourceType: SourceType
   sourceFile: string
   name: string
   type: string
   description: string
   documentation: string
   parentId?: string
+}
+
+function renderListItems(items: DocumentationItem[]) {
+  return items.map((item) => (
+    <List.Item
+      key={item.id}
+      icon={Icon.Bird}
+      title={item.name}
+      subtitle={item.description}
+      actions={
+        <ActionPanel>
+          <Action.Push title="Show Details" target={<Detail markdown={getMarkdownForDocumentationItem(item)} />} />
+        </ActionPanel>
+      }
+    />
+  ))
+}
+
+function getSourceIcon(sourceItem: SourceItem) {
+  if (sourceItem.type == null) {
+    return '🌐'
+  }
+
+  if (sourceItem.type === 'hs') {
+    return { source: 'icon-prod.png' }
+  } else if (sourceItem.type === 'Lua') {
+    return { source: 'icon-lua.png', tintColor: Color.SecondaryText }
+  } else {
+    return '🥄'
+  }
 }
 
 function getMarkdownForDocumentationItem(item: DocumentationItem): string {
@@ -149,7 +217,16 @@ async function extractDocumentationFromDocsFiles(docsInfo: DocumentationOutput) 
   const allFiles = docsInfo?.allFiles ?? []
   const documentationList: DocumentationItem[] = []
   const sourceList: SourceItem[] = []
-  const documentationItemsMap = new Map<string, number>()
+  const sourceToDocumentationRangeEntries: Pick<
+    DocumentationRepository,
+    'sourceToDocumentationRangeEntries'
+  >['sourceToDocumentationRangeEntries'] = []
+  const documentationItemsEntries: Pick<
+    DocumentationRepository,
+    'documentationItemsEntries'
+  >['documentationItemsEntries'] = []
+
+  let itemIdx = -1
 
   for (const docFilePath of allFiles) {
     let sourceName = path.basename(path.dirname(docFilePath))
@@ -164,6 +241,7 @@ async function extractDocumentationFromDocsFiles(docsInfo: DocumentationOutput) 
     }
 
     sourceList.push({
+      type: sourceType,
       name: sourceName,
       path: docFilePath
     })
@@ -178,6 +256,8 @@ async function extractDocumentationFromDocsFiles(docsInfo: DocumentationOutput) 
     }
 
     const toProcess = items.map((item: object) => ({ item }))
+
+    let rangeStart = -1
 
     while (toProcess.length > 0) {
       const current = toProcess.shift()
@@ -238,8 +318,13 @@ async function extractDocumentationFromDocsFiles(docsInfo: DocumentationOutput) 
 
         // keep a record of the id to index of the item in the documentation list
         // for fast access
-        documentationItemsMap.set(docItem.id, documentationList.length)
+        documentationItemsEntries.push([docItem.id, documentationList.length])
         documentationList.push(docItem)
+        itemIdx++
+
+        if (rangeStart === -1) {
+          rangeStart = itemIdx
+        }
 
         if (Array.isArray(item.items)) {
           if (parent != null) {
@@ -274,7 +359,16 @@ async function extractDocumentationFromDocsFiles(docsInfo: DocumentationOutput) 
         throw new Error(msg, { cause: error })
       }
     }
+
+    if (rangeStart !== -1) {
+      sourceToDocumentationRangeEntries.push([docFilePath, [rangeStart, itemIdx]])
+    }
   }
 
-  return { sourceList, documentationList, documentationItemsMap }
+  return {
+    sourceList,
+    sourceToDocumentationRangeEntries,
+    documentationList,
+    documentationItemsEntries
+  }
 }
