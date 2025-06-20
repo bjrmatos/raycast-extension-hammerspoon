@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import fsPromise from 'node:fs/promises'
-import { ActionPanel, Detail, List, Action, Icon, Color } from '@raycast/api'
+import { ActionPanel, Detail, List, Action, Color } from '@raycast/api'
 import { runAppleScript, useCachedPromise, useCachedState } from '@raycast/utils'
 import { useMemo } from 'react'
 import path from 'node:path'
@@ -78,7 +78,7 @@ export default function main() {
         result.push({
           id: `${selectedSourceItem.name}-${selectedSourceItem.path}`,
           name: selectedSourceItem.name,
-          items: documentationRepository.documentationList.slice(rangeStart, rangeEnd)
+          items: documentationRepository.documentationList.slice(rangeStart, rangeEnd + 1)
         })
       }
     }
@@ -118,7 +118,7 @@ export default function main() {
     for (const group of groups) {
       groupEls.push(
         <List.Section key={group.id} title={group.name}>
-          {renderListItems(group.items)}
+          {renderListItems(group.items, documentationItemsMap)}
         </List.Section>
       )
     }
@@ -132,7 +132,10 @@ export default function main() {
 
     if (range) {
       const [rangeStart, rangeEnd] = range
-      listContentEl = renderListItems(documentationRepository.documentationList.slice(rangeStart, rangeEnd + 1))
+      listContentEl = renderListItems(
+        documentationRepository.documentationList.slice(rangeStart, rangeEnd + 1),
+        documentationItemsMap
+      )
     }
   }
 
@@ -178,20 +181,25 @@ interface DocumentationItem {
   parentId?: string
 }
 
-function renderListItems(items: DocumentationItem[]) {
-  return items.map((item) => (
-    <List.Item
-      key={item.id}
-      icon={Icon.Bird}
-      title={item.name}
-      subtitle={item.description}
-      actions={
-        <ActionPanel>
-          <Action.Push title="Show Details" target={<Detail markdown={getMarkdownForDocumentationItem(item)} />} />
-        </ActionPanel>
-      }
-    />
-  ))
+function renderListItems(items: DocumentationItem[], documentationItemsMap: Map<string, number>) {
+  return items.map((item) => {
+    const keywords = item.name.includes('.') ? item.name.split('.') : []
+
+    return (
+      <List.Item
+        key={item.id}
+        icon={{ value: getDocumentationTypeIcon(item), tooltip: item.type }}
+        title={{ value: item.name, tooltip: item.type }}
+        keywords={keywords}
+        subtitle={{ value: item.description, tooltip: item.description }}
+        actions={
+          <ActionPanel>
+            <Action.Push title="Show Details" target={<Detail markdown={getMarkdownForDocumentationItem(item)} />} />
+          </ActionPanel>
+        }
+      />
+    )
+  })
 }
 
 function getSourceIcon(sourceItem: SourceItem) {
@@ -208,8 +216,41 @@ function getSourceIcon(sourceItem: SourceItem) {
   }
 }
 
+function getDocumentationTypeIcon(documentationItem: DocumentationItem) {
+  // the icons were taken from vscode icons and carbon design system icons
+  // https://github.com/microsoft/vscode-icons/tree/main/icons/dark
+  // https://github.com/carbon-design-system/carbon/blob/main/packages/icons/src/svg/32
+  // we just converted them to 64x64 png with
+  // https://cloudconvert.com/svg-to-png
+  if (documentationItem.type === 'Module') {
+    return { source: 'symbol-namespace.png', tintColor: Color.SecondaryText }
+  } else if (documentationItem.type === 'Variable') {
+    return { source: 'symbol-variable.png', tintColor: Color.Blue }
+  } else if (documentationItem.type === 'Field') {
+    return { source: 'symbol-field.png', tintColor: Color.Blue }
+  } else if (documentationItem.type === 'Constant') {
+    return { source: 'symbol-constant.png', tintColor: Color.Blue }
+  } else if (documentationItem.type === 'Constructor') {
+    return { source: 'symbol-interface.png', tintColor: Color.Orange }
+  } else if (documentationItem.type === 'Method') {
+    return { source: 'function.png', tintColor: Color.Magenta }
+  } else if (documentationItem.type === 'Function') {
+    return { source: 'function-math.png', tintColor: Color.Magenta }
+  } else if (documentationItem.type === 'Deprecated') {
+    return { source: 'warning.png', tintColor: Color.Yellow }
+  } else if (documentationItem.type === 'builtin') {
+    return { source: 'symbol-misc.png', tintColor: Color.Magenta }
+  } else if (documentationItem.type === 'c-api') {
+    return { source: 'fragments.png', tintColor: Color.Orange }
+  } else if (documentationItem.type === 'manual') {
+    return { source: 'book.png', tintColor: Color.SecondaryText }
+  }
+
+  return { source: 'symbol-keyword.png', tintColor: Color.SecondaryText }
+}
+
 function getMarkdownForDocumentationItem(item: DocumentationItem): string {
-  return `# ${item.name}\n\n${item.description}\n\n${item.documentation}`
+  return `# ${item.name}\n\n${item.documentation}`
 }
 
 async function extractDocumentationFromDocsFiles(docsInfo: DocumentationOutput) {
@@ -275,9 +316,25 @@ async function extractDocumentationFromDocsFiles(docsInfo: DocumentationOutput) 
         assert(item.name.trim().length > 0, `Expected name to be non-empty string`)
 
         let type = item.type
+        let name
 
-        if (parent == null && sourceType === 'Lua' && !type) {
-          type = 'Module'
+        if (parent == null && sourceType === 'Lua') {
+          if (!type) {
+            type = 'manual'
+          }
+
+          name = item.name.startsWith('lua.') ? item.name.slice(4) : item.name
+        } else {
+          name = item.name
+        }
+
+        if (parent != null) {
+          // skip adding Lua prefix for globals
+          const parentName = sourceType === 'Lua' && parent.name === 'lua' ? '' : parent.name
+
+          if (parentName !== '') {
+            name = `${parent.name}.${name}`
+          }
         }
 
         if (parent != null) {
@@ -294,25 +351,42 @@ async function extractDocumentationFromDocsFiles(docsInfo: DocumentationOutput) 
           idParts.push(sourceType)
         }
 
-        idParts.push(item.type)
-        idParts.push(item.name)
+        idParts.push(type)
+        idParts.push(name)
+
+        let description = item.desc
+
+        // generate description from .doc when it does not exists
+        if (description == null) {
+          const firstNewLineIndex = item.doc.indexOf('\n')
+
+          if (firstNewLineIndex === -1) {
+            description = item.doc.slice(0, 100)
+          } else {
+            description = item.doc.slice(0, firstNewLineIndex)
+          }
+
+          if (description.startsWith('`') && description.endsWith('`')) {
+            description = description.slice(1, -1)
+          }
+        }
+
+        let documentation = item.doc
+
+        // verify that .desc is part of .doc, if not concat it to
+        // get the final documentation to use
+        if (item.desc != null && !item.doc.startsWith(item.desc)) {
+          documentation = item.desc + '\n\n' + item.doc
+        }
 
         const docItem: DocumentationItem = {
           id: idParts.join('-'),
           sourceType,
           sourceFile: docFilePath,
-          name: item.name,
-          type: item.type,
-          // TODO: we are setting a default value here for these keys
-          // just for debugging purposes, we should analyze the json values
-          // and decide what to do if the values are missing.
-          // Also seems that .desc is always present in .doc, .desc seems to be a short representation of .doc
-          // (or fist characters of what the .doc contains), in any case we should check if this is always the case.
-          // if not we concat the .desc + .doc = our documentation.
-          // the intention will be that we use .description for the List item subtitle
-          // and .documentation as the body of the text we show in Detail
-          description: item.desc || '_No Description_',
-          documentation: item.doc || '_No Documentation_',
+          name,
+          type: type,
+          description,
+          documentation,
           parentId: parent?.id
         }
 
