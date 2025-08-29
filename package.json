@@ -89,6 +89,26 @@
       "mode": "view"
     },
     {
+      "name": "list-scripts",
+      "title": "List Scripts",
+      "description": "List and quickly trigger User Defined Hammerspoon Scripts",
+      "keywords": [
+        "Macros",
+        "Actions"
+      ],
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "scriptsVariableName",
+          "title": "Scripts Variable Name",
+          "description": "The name of the global variable exported in your Hammerspoon configuration file that contains the methods to work with scripts",
+          "type": "textfield",
+          "default": "__SCRIPTS__",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "restart",
       "title": "Restart",
       "description": "Quits and restarts Hammerspoon",
