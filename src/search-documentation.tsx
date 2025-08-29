@@ -1,7 +1,7 @@
 import path from 'node:path'
 import fsPromise from 'node:fs/promises'
 import { useMemo } from 'react'
-import { ActionPanel, List, Action, environment } from '@raycast/api'
+import { ActionPanel, List, Action, environment, Icon } from '@raycast/api'
 import { runAppleScript, useCachedPromise, useCachedState } from '@raycast/utils'
 import DocumentationItemDetail from './search-documentation/DocumentationItemDetail'
 import { getDocumentationTypeIcon, getSourceTypeIcon } from './documentation/icons'
@@ -16,8 +16,8 @@ export default function main() {
 
   const {
     isLoading,
-    data: documentationRepository
-    // revalidate: revalidateDocs
+    data: documentationRepository,
+    revalidate: revalidateDocs
   } = useCachedPromise(
     async (): Promise<DocumentationRepository> => {
       const jxaScript = (await fsPromise.readFile(jxaScriptPath)).toString()
@@ -109,7 +109,7 @@ export default function main() {
     for (const group of groups) {
       groupEls.push(
         <List.Section key={group.id} title={group.name}>
-          {renderListItems(group.items, documentationContextValue)}
+          {renderListItems(group.items, documentationContextValue, revalidateDocs)}
         </List.Section>
       )
     }
@@ -125,7 +125,8 @@ export default function main() {
       const [rangeStart, rangeEnd] = range
       listContentEl = renderListItems(
         documentationRepository.documentationList.slice(rangeStart, rangeEnd + 1),
-        documentationContextValue
+        documentationContextValue,
+        revalidateDocs
       )
     }
   }
@@ -141,7 +142,11 @@ export default function main() {
   )
 }
 
-function renderListItems(items: DocumentationItem[], documentationContextValue: DocumentationContextValue) {
+function renderListItems(
+  items: DocumentationItem[],
+  documentationContextValue: DocumentationContextValue,
+  revalidateDocs: () => void
+) {
   return items.map((item) => {
     const keywords = item.name.includes('.') ? item.name.split('.') : []
 
@@ -161,6 +166,12 @@ function renderListItems(items: DocumentationItem[], documentationContextValue: 
                   <DocumentationItemDetail item={item} />
                 </DocumentationContext>
               }
+            />
+            <Action
+              title="Refresh"
+              onAction={revalidateDocs}
+              shortcut={{ modifiers: ['cmd'], key: 'r' }}
+              icon={Icon.RotateClockwise}
             />
           </ActionPanel>
         }
