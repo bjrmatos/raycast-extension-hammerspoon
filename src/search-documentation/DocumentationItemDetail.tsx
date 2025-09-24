@@ -1,10 +1,10 @@
 import { Action, ActionPanel, closeMainWindow, Detail } from '@raycast/api'
 import { runAppleScript } from '@raycast/utils'
 import { GotoSubmenu } from './GotoSubmenu'
-import { DocumentationItem } from '../documentation/types'
+import { DocumentationDetailItem } from '../documentation/types'
 
 type DocumentationItemDetailProps = {
-  item: DocumentationItem
+  item: DocumentationDetailItem
 }
 
 export default function DocumentationItemDetail({ item }: DocumentationItemDetailProps) {
@@ -73,6 +73,6 @@ export default function DocumentationItemDetail({ item }: DocumentationItemDetai
   )
 }
 
-function getMarkdownForDocumentationItem(item: DocumentationItem): string {
+function getMarkdownForDocumentationItem(item: DocumentationDetailItem): string {
   return `# ${item.name}\n${item.documentation}\n`
 }

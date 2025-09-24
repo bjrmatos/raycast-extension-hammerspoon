@@ -1,13 +1,19 @@
+import path from 'node:path'
+import fs from 'node:fs'
 import { useContext, useState } from 'react'
-import { DocumentationItem } from '../documentation/types'
+import { DocumentationItem, DocumentationDetailItem } from '../documentation/types'
 import { getDocumentationTypeIcon } from '../documentation/icons'
-import { Action, ActionPanel, Icon, useNavigation } from '@raycast/api'
+import { Action, ActionPanel, environment, Icon, useNavigation } from '@raycast/api'
 import DocumentationItemDetail from './DocumentationItemDetail'
 import { DocumentationContext } from '../documentation/DocumentationContext'
+import { runAppleScript } from '@raycast/utils'
 
 type GotoSubmenuProps = {
-  item: DocumentationItem
+  item: DocumentationDetailItem
 }
+
+const jxaScriptPath = path.join(environment.assetsPath, 'fetchDocumentationRepositoryScript.jxa.txt')
+const jxaScript = fs.readFileSync(jxaScriptPath).toString()
 
 export function GotoSubmenu({ item }: GotoSubmenuProps) {
   const documentationContextValue = useContext(DocumentationContext)
@@ -55,10 +61,20 @@ export function GotoSubmenu({ item }: GotoSubmenuProps) {
           key={itemInScope.id}
           title={itemInScope.name}
           icon={getDocumentationTypeIcon(itemInScope.type)}
-          onAction={() => {
+          onAction={async () => {
+            const output = await runAppleScript(
+              jxaScript,
+              ['detail', itemInScope.sourceFile, itemInScope.sourceType, itemInScope.id],
+              {
+                language: 'JavaScript'
+              }
+            )
+
+            const documentationDetailItem = JSON.parse(output) as DocumentationDetailItem
+
             push(
               <DocumentationContext value={documentationContextValue}>
-                <DocumentationItemDetail item={itemInScope} />
+                <DocumentationItemDetail item={documentationDetailItem} />
               </DocumentationContext>
             )
           }}

@@ -1,18 +1,19 @@
 import path from 'node:path'
-import fsPromise from 'node:fs/promises'
+import fs from 'node:fs'
 import { useMemo } from 'react'
-import { ActionPanel, List, Action, environment, Icon } from '@raycast/api'
+import { ActionPanel, List, Action, environment, Icon, useNavigation } from '@raycast/api'
 import { runAppleScript, useCachedPromise, useCachedState } from '@raycast/utils'
 import DocumentationItemDetail from './search-documentation/DocumentationItemDetail'
 import { getDocumentationTypeIcon, getSourceTypeIcon } from './documentation/icons'
 import { DocumentationContext, DocumentationContextValue } from './documentation/DocumentationContext'
-import { DocumentationItem, DocumentationRepository, SourceItem } from './documentation/types'
+import { DocumentationDetailItem, DocumentationItem, DocumentationRepository, SourceItem } from './documentation/types'
 
 const jxaScriptPath = path.join(environment.assetsPath, 'fetchDocumentationRepositoryScript.jxa.txt')
+const jxaScript = fs.readFileSync(jxaScriptPath).toString()
 const defaultSource = { name: 'All Sources', path: '*' }
 
 export default function main() {
-  const [selectedSource, setSelectedSource] = useCachedState<SourceItem>('selected-source', defaultSource)
+  const [selectedSource, setSelectedSource] = useCachedState<SourceItem>('selected-sourced', defaultSource)
 
   const {
     isLoading,
@@ -20,8 +21,7 @@ export default function main() {
     revalidate: revalidateDocs
   } = useCachedPromise(
     async (): Promise<DocumentationRepository> => {
-      const jxaScript = (await fsPromise.readFile(jxaScriptPath)).toString()
-      const output = await runAppleScript(jxaScript, { language: 'JavaScript' })
+      const output = await runAppleScript(jxaScript, [], { language: 'JavaScript' })
 
       const docsRepository = JSON.parse(output) as DocumentationRepository
       return docsRepository
@@ -147,6 +147,8 @@ function renderListItems(
   documentationContextValue: DocumentationContextValue,
   revalidateDocs: () => void
 ) {
+  const { push } = useNavigation()
+
   return items.map((item) => {
     const keywords = item.name.includes('.') ? item.name.split('.') : []
 
@@ -159,13 +161,21 @@ function renderListItems(
         subtitle={{ value: item.description, tooltip: item.description }}
         actions={
           <ActionPanel>
-            <Action.Push
+            <Action
               title="Show Details"
-              target={
-                <DocumentationContext value={documentationContextValue}>
-                  <DocumentationItemDetail item={item} />
-                </DocumentationContext>
-              }
+              onAction={async () => {
+                const output = await runAppleScript(jxaScript, ['detail', item.sourceFile, item.sourceType, item.id], {
+                  language: 'JavaScript'
+                })
+
+                const documentationDetailItem = JSON.parse(output) as DocumentationDetailItem
+
+                push(
+                  <DocumentationContext value={documentationContextValue}>
+                    <DocumentationItemDetail item={documentationDetailItem} />
+                  </DocumentationContext>
+                )
+              }}
             />
             <Action
               title="Refresh"

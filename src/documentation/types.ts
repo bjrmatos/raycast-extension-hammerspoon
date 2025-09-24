@@ -13,9 +13,12 @@ export interface DocumentationItem {
   name: string
   type: string
   description: string
-  documentation: string
   parentId?: string
   childrenIds?: string[]
+}
+
+export type DocumentationDetailItem = DocumentationItem & {
+  documentation: string
 }
 
 export interface DocumentationRepository {
