@@ -18,6 +18,28 @@
   },
   "commands": [
     {
+      "name": "open-configuration-file",
+      "title": "Open Configuration File",
+      "description": "Open the Hammerspoon configuration file",
+      "mode": "no-view",
+      "preferences": [
+        {
+          "name": "configFilePath",
+          "title": "Configuration File Path",
+          "description": "Path to the Hammerspoon configuration file. Defaults to hs.configdir/init.lua",
+          "type": "file",
+          "required": false
+        },
+        {
+          "name": "editorApp",
+          "title": "Editor Application",
+          "description": "Application to use when opening the configuration file. If not set it uses the default application for the .lua file type.",
+          "type": "appPicker",
+          "required": false
+        }
+      ]
+    },
+    {
       "name": "reload-configuration-file",
       "title": "Reload Configuration File",
       "description": "Reloads the Hammerspoon configuration file",
