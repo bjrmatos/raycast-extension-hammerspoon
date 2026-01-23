@@ -81,7 +81,7 @@ try {
   })
 
   console.log(
-    '\nAll done now it is time to publish, run:\nnpx ray publish\nafter it dont forget to go back to dev mode with:\nnpm run publish dev'
+    '\nAll done now it is time to publish, run:\nnpx ray publish\n'
   )
 } catch (error) {
   spinner.fail(`Publish failed: ${error.message}`)
