@@ -3,7 +3,7 @@
   "name": "hammerspoon",
   "title": "Hammerspoon",
   "description": "Control Hammerspoon from Raycast",
-  "version": "1.3.0",
+  "version": "1.2.0",
   "icon": "icon-prod.png",
   "author": "bjrmatos",
   "contributors": [
